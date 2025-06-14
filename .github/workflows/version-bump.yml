@@ -54,18 +54,22 @@ jobs:
 
           # Read the current version from the VERSION file
           current_version=$(cat VERSION)
+          if [[ ! $current_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format in VERSION file. Setting to 0.1.0"
+            current_version="0.1.0"
+            echo "$current_version" > VERSION
+          fi
 
-          # Split version into components
-          IFS="." read -r -a version_parts <<< "$current_version"
-
-          # Increment the patch version
-          ((version_parts[2]++))
+          # Split version into array and ensure it has 3 components
+          IFS='.' read -r major minor patch <<< "$current_version"
           
-          # Create new version string
-          new_version="${version_parts[0]}.${version_parts[1]}.${version_parts[2]}"
+          # Increment patch version
+          new_version="${major}.${minor}.$((patch + 1))"
+          echo "Bumping version from $current_version to $new_version"
 
           # Update the version file
           echo "$new_version" > VERSION
+
           echo "Bumped version to $new_version"
 
           # Commit and push the changes
