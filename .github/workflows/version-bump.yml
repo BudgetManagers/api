@@ -1,0 +1,58 @@
+name: Version Bumper on Merge to Main
+on:
+  pull_request:
+    types: [closed]
+    brances:
+      - main
+
+jobs:
+  version-bumper:
+    if: github.event.pull_request.merged == true &&
+        !contains(github.event.pull_request.labels.*.name, 'version-bump-pr')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.BUDGET_MANAGER_WORKFLOW_TOKEN }}
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "action@github.com"
+      - name: version-bumper
+        run: |
+          # Read the current version from the VERSION file
+          current_version=$(cat VERSION)
+
+          # Split version into components
+          IFS="." read -r -a version_parts <<< "$current_version"
+
+          # Increment the patch version
+          ((version_parts[2]++))
+          
+          # Create new version string
+          new_version="${version_parts[0]}.${version_parts[1]}.${version_parts[2]}"
+
+          # Update the version file
+          echo "$new_version" > VERSION
+          echo "Bumped version to $new_version"
+
+          # Commit and push the changes
+          git checkout -b bump-version-${new_version}
+          git add VERSION
+          git commit -m "Bump version to $new_version [skip ci]"
+          git push origin bump-version-${new_version}
+
+          # Create a pull request, include the version-bump-pr label
+
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.BUDGET_MANAGER_WORKFLOW_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/pulls \
+            -d '{
+              "title": "Bump version to '"$new_version"'",
+              "head": "bump-version-'$new_version'",
+              "base": "main",
+              "body": "This PR bumps the version to '"$new_version"'.",
+              "labels": ["version-bump-pr"]
+            }'
