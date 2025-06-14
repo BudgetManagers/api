@@ -38,6 +38,20 @@ jobs:
 
       - name: version-bumper
         run: |
+          # Enable error tracing
+          set -x
+          
+          # Check if VERSION file exists
+          if [ ! -f VERSION ]; then
+            echo "::error::VERSION file not found in repository root"
+            ls -la
+            echo "Creating initial VERSION file..."
+            echo "0.0.0" > VERSION
+          fi
+
+          echo "Current directory contents:"
+          ls -la
+
           # Read the current version from the VERSION file
           current_version=$(cat VERSION)
 
