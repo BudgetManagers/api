@@ -2,7 +2,7 @@ name: Version Bumper on Merge to Main
 on:
   pull_request:
     types: [closed]
-    brances:
+    branches:
       - main
 
 jobs:
@@ -19,6 +19,23 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "action@github.com"
+      # - name: Determineversion bump type
+      #   id: bump-type
+      #   run: |
+      #     if [[ $(curl -s -H "Authorization: token ${{ secrets.BUDGET_MANAGER_WORKFLOW_TOKEN }}" \
+      #       -H "Accept: application/vnd.github.v3+json" \
+      #       https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}) \
+      #       | jq -r '.labels[].name' | grep -c 'major' ]] ; then
+      #       echo "BUMP_TYPE=major" >> $API_BUMP_TYPE
+      #     elif [[ $(curl -s -H "Authorization: token ${{ secrets.BUDGET_MANAGER_WORKFLOW_TOKEN }}" \
+      #       -H "Accept: application/vnd.github.v3+json" \
+      #       https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}) \
+      #       | jq -r '.labels[].name' | grep -c 'minor' ]] ; then
+      #       echo "BUMP_TYPE=minor" >> $API_BUMP_TYPE
+      #     else
+      #       echo "BUMP_TYPE=patch" >> $API_BUMP_TYPE
+      #     fi
+
       - name: version-bumper
         run: |
           # Read the current version from the VERSION file
@@ -40,19 +57,37 @@ jobs:
           # Commit and push the changes
           git checkout -b bump-version-${new_version}
           git add VERSION
-          git commit -m "Bump version to $new_version [skip ci]"
-          git push origin bump-version-${new_version}
+          git commit -m "Bump version to $new_version [skip ci]" || {
+            echo "No changes to commit"
+            exit 0
+          }
+          
+          git push origin "$branch_name" || {
+            echo "Failed to push branch"
+            exit 1
+          }
 
-          # Create a pull request, include the version-bump-pr label
-
-          curl -X POST \
+          # Create a pull request
+          pr_response=$(curl -s -X POST \
             -H "Authorization: token ${{ secrets.BUDGET_MANAGER_WORKFLOW_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/pulls \
-            -d '{
-              "title": "Bump version to '"$new_version"'",
-              "head": "bump-version-'$new_version'",
-              "base": "main",
-              "body": "This PR bumps the version to '"$new_version"'.",
-              "labels": ["version-bump-pr"]
-            }'
+            -d "{
+              \"title\": \"Bump version to ${new_version}\",
+              \"head\": \"${branch_name}\",
+              \"base\": \"main\",
+              \"body\": \"Automated version bump\",
+              \"labels\": [\"version-bump-pr\"]
+            }")
+
+          echo "Pull request creation response:"
+          echo "$pr_response"
+
+          # Check if PR was created successfully
+          if echo "$pr_response" | grep -q "\"url\":"; then
+            echo "Pull request created successfully"
+          else
+            echo "Failed to create pull request"
+            echo "$pr_response"
+            exit 1
+          fi
