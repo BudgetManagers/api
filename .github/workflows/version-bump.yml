@@ -55,7 +55,11 @@ jobs:
           echo "Bumped version to $new_version"
 
           # Commit and push the changes
-          git checkout -b bump-version-${new_version}
+          branch_name="bump-version-${new_version}"
+          git checkout -b "$branch_name" || {
+            echo "Failed to create branch $branch_name"
+            exit 1
+          }
           git add VERSION
           git commit -m "Bump version to $new_version [skip ci]" || {
             echo "No changes to commit"
