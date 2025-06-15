@@ -1,0 +1,6 @@
+[submodule "internal/core"]
+	path = internal/core
+	url = git@github.com:BudgetManagers/core.git
+[submodule "internal/common"]
+	path = internal/common
+	url = git@github.com:BudgetManagers/common.git
